@@ -35,7 +35,7 @@
     <!-- 功能入口 -->
     <section class="mine-group">
       <h3 class="mine-group-title">我的求职</h3>
-      <button v-for="item in jobMenus" :key="item.label" class="mine-row" @click="handle(item)">
+      <button v-for="item in menuList" :key="item.label" class="mine-row" @click="handle(item)">
         <span class="mine-ico">{{ item.icon }}</span>
         <span class="mine-label">{{ item.label }}</span>
         <span v-if="item.tip" class="mine-tip">{{ item.tip }}</span>
@@ -87,6 +87,7 @@ const displayName = computed(() => {
 })
 
 const jobMenus = [
+  { icon: '🔔', label: '消息中心', path: '/worker/messages', auth: true },
   { icon: '📋', label: '我的投递', path: '/worker/my-applies', auth: true },
   { icon: '⭐', label: '我的收藏', path: '/worker/favorites', auth: false },
   { icon: '📝', label: '我的简历', path: '/worker/resume', auth: true },
@@ -100,6 +101,16 @@ const moreMenus = [
   { icon: '🛠️', label: '同城服务', path: '/worker/service', auth: false },
   { icon: '🎧', label: '联系客服', action: 'service', auth: false }
 ]
+
+// 未读消息数：给「消息中心」加红点提示
+const unreadCount = ref(0)
+const menuList = computed(() =>
+  jobMenus.map((m) =>
+    m.path === '/worker/messages' && unreadCount.value
+      ? { ...m, tip: `${unreadCount.value} 条未读` }
+      : m
+  )
+)
 
 function go(path) {
   router.push(path)
@@ -134,6 +145,11 @@ async function load() {
   try {
     const res = await api.get('/jobs/my-applications')
     applyCount.value = Array.isArray(res.data) ? res.data.length : 0
+  } catch (err) {}
+
+  try {
+    const res = await api.get('/notifications/unread-count')
+    unreadCount.value = res.data?.count || 0
   } catch (err) {}
 
   try {

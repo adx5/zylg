@@ -74,6 +74,9 @@ async function load() {
     profile.value = {}
   }
 
+  // 未入驻（id 为空）时不再拼 undefined 去请求，避免 422 与原始报错外露
+  if (!profile.value.id) return
+
   try {
     const d = await api.get(`/services/providers/${profile.value.id}`)
     goodRate.value = d.data?.stats?.good_rate ?? 100

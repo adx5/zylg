@@ -368,8 +368,22 @@ async def my_profile(db: AsyncSession = Depends(get_db),
     profile = (await db.execute(
         select(ProviderProfile).where(ProviderProfile.user_id == current_user.id)
     )).scalar_one_or_none()
+
+    # 未入驻的服务商不返回 404（前端会渲染报错），给一份空档案让页面走空态
     if not profile:
-        raise HTTPException(status_code=404, detail="服务商档案不存在，请先完成入驻")
+        return {"code": 0, "data": {
+            "id": None,
+            "display_name": current_user.nickname or "服务商",
+            "avatar": "",
+            "intro": "",
+            "district": "",
+            "rating": 0,
+            "orders_done": 0,
+            "verify_status": current_user.verify_status or "unverified",
+            "category_name": "同城服务",
+            "tags": [],
+            "not_onboarded": True,
+        }}
 
     category = await db.get(ServiceCategory, profile.category_id) if profile.category_id else None
 

@@ -5,6 +5,8 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', redirect: '/worker/home' },
+  // 全局兜底：未注册路径不再白屏（BUG-07）
+  { path: '/:pathMatch(.*)*', component: () => import('../views/NotFound.vue') },
     { path: '/login', component: () => import('../views/Login.vue') },
 
     {
@@ -22,6 +24,7 @@ const router = createRouter({
         { path: 'service-reviews/:id', component: () => import('../views/worker/ServiceReviews.vue') },
         { path: 'my-applies', component: () => import('../views/worker/WorkerMyApplies.vue'), meta: { requireAuth: true } },
         { path: 'favorites', component: () => import('../views/worker/WorkerFavorites.vue') },
+        { path: 'messages', component: () => import('../views/worker/WorkerMessages.vue'), meta: { requireAuth: true } },
         { path: 'task', component: () => import('../views/worker/WorkerTask.vue'), meta: { requireAuth: true } },
         { path: 'exchange', component: () => import('../views/worker/WorkerExchange.vue'), meta: { requireAuth: true } },
         { path: 'mine', component: () => import('../views/worker/WorkerMine.vue'), meta: { requireAuth: true } },

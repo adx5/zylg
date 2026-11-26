@@ -135,10 +135,13 @@ async def get_received_count(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(require_roles(["merchant", "provider"]))
 ):
-    query = select(func.count(JobApplication.id)).join(Job, JobApplication.job_id == Job.id).where(
-        Job.merchant_id == current_user.id, JobApplication.status == 1)
-    count = (await db.execute(query)).scalar()
-    return {"code": 0, "data": {"count": count}}
+    # count = 全部收到过的简历数（与 /jobs/received 列表口径一致）
+    # new_count = 其中尚未处理（status=1）的新简历
+    base = select(func.count(JobApplication.id)).join(Job, JobApplication.job_id == Job.id).where(
+        Job.merchant_id == current_user.id)
+    total = (await db.execute(base)).scalar() or 0
+    new_count = (await db.execute(base.where(JobApplication.status == 1))).scalar() or 0
+    return {"code": 0, "data": {"count": total, "new_count": new_count}}
 
 
 @router.get("/interview-count")
@@ -226,13 +229,20 @@ async def get_pending_reviews(
     query = select(JobApplication, Job.title, User.nickname).join(Job, JobApplication.job_id == Job.id).join(User,
                                                                                                              JobApplication.worker_id == User.id).outerjoin(
         Review, Review.application_id == JobApplication.id).where(
-        Job.merchant_id == current_user.id, JobApplication.status == 8, Review.id == None
+        Job.merchant_id == current_user.id, JobApplication.status.in_([7, 8]), Review.id == None
     ).order_by(JobApplication.id.desc())
     result = await db.execute(query)
     data = []
     for app, title, nickname in result.all():
-        data.append({"application_id": app.id, "worker_name": nickname, "job_title": title,
-                     "finish_time": app.finish_time.strftime("%m-%d %H:%M") if app.finish_time else "未知"})
+        data.append({
+            "application_id": app.id,
+            "worker_name": nickname,
+            "job_title": title,
+            # phase：confirm=待商家确认完工；review=待评价
+            "phase": "confirm" if app.status == 7 else "review",
+            "status": app.status,
+            "finish_time": app.finish_time.strftime("%m-%d %H:%M") if app.finish_time else "未知",
+        })
     return {"code": 0, "data": data}
 
 

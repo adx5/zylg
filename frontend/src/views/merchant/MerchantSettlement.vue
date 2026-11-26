@@ -21,14 +21,18 @@
           <!-- 履约中 -->
           <div v-if="item.status === 5" class="status-working">履约中，等待工人完工申请...</div>
 
-          <!-- 待评价 (C端申请完结单 或 已完工但没打分) -->
-          <div v-if="item.status === 7 || (item.status === 8 && !item.star)" class="pending-box">
+          <!-- 工人已申请完工，待商家确认 -->
+          <div v-if="item.status === 7" class="pending-box">
+            <span class="confirm-tip">工人已申请完工，请确认</span>
+            <button class="btn-submit" @click="confirmFinish(item)">确认完工</button>
+          </div>
+
+          <!-- 已完工待评价 -->
+          <div v-if="item.status === 8 && !item.star" class="pending-box">
             <div class="stars">
               <span v-for="i in 5" :key="i" @click="setStar(item, i)" :class="{ active: i <= item.currentStar }">★</span>
             </div>
-            <button class="btn-submit" @click="confirmAndReview(item)">
-              {{ item.status === 7 ? '确认完工并评价' : '提交评价' }}
-            </button>
+            <button class="btn-submit" @click="confirmAndReview(item)">提交评价</button>
           </div>
 
           <!-- 已完成 -->
@@ -69,27 +73,32 @@ const loadData = async () => {
 }
 
 const displayList = computed(() => {
-  if (mainTab.value === 'working') return list.value.filter(item => item.status === 5)
-  // 待评价：状态7或者状态8且没打分
-  return list.value.filter(item => [7, 8].includes(item.status))
+  // 履约中：已录用(5) + 工人已申请完工待确认(7)，避免申请完工后从列表消失
+  if (mainTab.value === 'working') return list.value.filter(item => [5, 7].includes(item.status))
+  // 待评价：已完工(8)且未打分
+  return list.value.filter(item => item.status === 8)
 })
 
 const setStar = (item, star) => { item.currentStar = star }
 
+const confirmFinish = async (item) => {
+  if (!window.confirm(`确认【${item.worker_name}】已完成【${item.job_title}】并发放积分？`)) return
+  try {
+    const res = await api.put(`/jobs/application/${item.id}/confirm-finish`)
+    window.$toast(res.message || '已确认完工')
+    loadData()
+  } catch (err) {
+    window.$toast(err.response?.data?.detail || '操作失败')
+  }
+}
+
 const confirmAndReview = async (item) => {
   if (!item.currentStar) return window.$toast('请先打分')
   try {
-    // 🚨 修复：只有状态 7 才调确认完工接口，状态 8 直接调评价接口
-    if (item.status === 7) {
-      await api.put(`/jobs/application/${item.id}/confirm-finish`)
-    }
-
-    // 调用评价接口 (如果之前没评过)
     if (!item.star) {
       await api.post('/jobs/review', { application_id: item.id, rating: item.currentStar, comment: "" })
     }
-
-    window.$toast('操作成功')
+    window.$toast('评价成功')
     loadData()
   } catch (err) {
     window.$toast(err.response?.data?.detail || '操作失败')
@@ -114,6 +123,7 @@ onMounted(() => { loadData() })
 .info h3 { font-size: 16px; color: #1f2937; margin-bottom: 4px; }
 .info p { font-size: 13px; color: #666; }
 .status-working { color: #3b82f6; font-weight: bold; text-align: center; padding: 10px; background: #eff6ff; border-radius: 6px; font-size: 14px; }
+.confirm-tip { font-size: 13px; color: #b45309; font-weight: 700; }
 .pending-box { display: flex; justify-content: space-between; align-items: center; background: #fffbeb; padding: 10px; border-radius: 6px; }
 .stars { font-size: 20px; color: #e5e7eb; cursor: pointer; }
 .stars span.active { color: #f59e0b; }

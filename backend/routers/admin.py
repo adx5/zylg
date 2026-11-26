@@ -38,7 +38,8 @@ async def get_stats(db: AsyncSession = Depends(get_db),
         _city_scope(select(func.count(Job.id)), current_user, Job))).scalar()
 
     pending_query = select(func.count(CooperationEntity.id)).where(
-        CooperationEntity.status == 'pending')
+        CooperationEntity.status == 'pending',
+        func.coalesce(CooperationEntity.name, "") != "")
     pending_companies = (await db.execute(
         _city_scope(pending_query, current_user, CooperationEntity))).scalar()
 
@@ -62,8 +63,10 @@ async def get_stats(db: AsyncSession = Depends(get_db),
 @router.get("/companies")
 async def get_companies(db: AsyncSession = Depends(get_db),
                         current_user: User = Depends(admin_required)):
-    query = select(CooperationEntity).order_by(
-        CooperationEntity.status.asc(), CooperationEntity.id.desc())
+    # 过滤掉自动注册产生的「无名称空壳备案」，避免污染审核队列（BUG-06）
+    query = select(CooperationEntity).where(
+        func.coalesce(CooperationEntity.name, "") != ""
+    ).order_by(CooperationEntity.status.asc(), CooperationEntity.id.desc())
     query = _city_scope(query, current_user, CooperationEntity)
     res = await db.execute(query)
     return {"code": 0, "data": res.scalars().all()}
