@@ -7,6 +7,8 @@ const router = createRouter({
     { path: '/', redirect: '/worker/home' },
   // 全局兜底：未注册路径不再白屏（BUG-07）
   { path: '/:pathMatch(.*)*', component: () => import('../views/NotFound.vue') },
+  // 通用实名认证页：求职者与服务商共用（不再强制跳 /worker 导致身份校验踢人）
+  { path: '/verify', component: () => import('../views/worker/WorkerVerify.vue'), meta: { requireAuth: true } },
     { path: '/login', component: () => import('../views/Login.vue') },
 
     {
@@ -25,6 +27,7 @@ const router = createRouter({
         { path: 'my-applies', component: () => import('../views/worker/WorkerMyApplies.vue'), meta: { requireAuth: true } },
         { path: 'favorites', component: () => import('../views/worker/WorkerFavorites.vue') },
         { path: 'messages', component: () => import('../views/worker/WorkerMessages.vue'), meta: { requireAuth: true } },
+        { path: 'service-orders', component: () => import('../views/worker/WorkerServiceOrders.vue'), meta: { requireAuth: true } },
         { path: 'task', component: () => import('../views/worker/WorkerTask.vue'), meta: { requireAuth: true } },
         { path: 'exchange', component: () => import('../views/worker/WorkerExchange.vue'), meta: { requireAuth: true } },
         { path: 'mine', component: () => import('../views/worker/WorkerMine.vue'), meta: { requireAuth: true } },
@@ -107,10 +110,25 @@ router.beforeEach((to, from, next) => {
     const multiMismatch = requiredRoles && !requiredRoles.includes(activeRole)
 
     if (singleMismatch || multiMismatch) {
-      if (window.$toast) window.$toast('身份不匹配，正在返回登录页...')
-      localStorage.clear()
-      setTimeout(() => { window.location.hash = '#/login' }, 1000)
-      return
+      // 🚨 修复：身份不匹配时不再清空登录态（原来会把用户直接踢回登录页），
+      //    改为友好提示并送回该身份自己的工作台。
+      const ROLE_HOME = {
+        worker: '/worker/home',
+        merchant: '/merchant/dash',
+        provider: '/provider/hall',
+        hq_ops: '/admin/dash',
+        hq_admin: '/admin/dash',
+        city_ops: '/admin/dash',
+        city_gov: '/admin/dash',
+        city_admin: '/admin/dash',
+        agent: '/admin/dash',
+        ops: '/admin/dash',
+        gov: '/admin/dash'
+      }
+      const home = ROLE_HOME[activeRole] || '/worker/home'
+      if (window.$toast) window.$toast('该页面不属于当前身份，已返回你的工作台')
+      if (to.path === home) return next()
+      return next(home)
     }
   }
   next()

@@ -49,6 +49,9 @@
       <p class="tips">未注册的手机号将自动创建账号</p>
       <p v-if="errorText" class="err">{{ errorText }}</p>
       <p v-if="needMerchant" class="link-line" @click="goMerchantVerify">前往完成商家认证 ›</p>
+
+      <!-- 不做登录也能先逛：游客态可浏览岗位与同城服务 -->
+      <p class="guest-line" @click="goGuest">暂不登录，先随便逛逛 ›</p>
     </div>
 
     <div class="bottom-roles" v-if="showAdminEntries">
@@ -170,6 +173,16 @@ function goMerchantVerify() {
   window.location.hash = '#/merchant/verify'
 }
 
+// 游客入口：不登录也能浏览岗位与同城服务
+function goGuest() {
+  const redirect = route.query.redirect
+  if (redirect) {
+    window.location.hash = '#' + String(redirect).replace(/^#/, '')
+  } else {
+    window.location.hash = '#/worker/home'
+  }
+}
+
 // 管理端入口（真实登录）
 const ADMIN_ROLE_MAP = { ops: 'hq_ops', gov: 'city_gov', agent: 'city_ops' }
 const ADMIN_LABEL = { ops: '运营方', gov: '监管方', agent: '经纪人' }
@@ -281,6 +294,15 @@ const goToAdmin = async (role) => {
 .tips { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 16px; line-height: 1.6; }
 .err { margin-top: 14px; text-align: center; font-size: 14px; color: #e5484d; line-height: 1.5; }
 .link-line { margin-top: 10px; text-align: center; font-size: 15px; color: #ff6b00; font-weight: 700; }
+
+.guest-line {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1677ff;
+  padding: 10px 0;
+}
 
 .bottom-roles { margin-top: auto; text-align: center; padding-bottom: 16px; color: #6b7280; font-size: 14px; }
 .bottom-roles span { cursor: pointer; margin: 0 8px; }

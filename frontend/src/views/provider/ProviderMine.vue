@@ -2,7 +2,7 @@
 <template>
   <div class="pm-page">
     <section class="pm-head">
-      <div class="pm-avatar">{{ avatarChar }}</div>
+      <UserAvatar class="pm-avatar" :size="64" />
       <div class="pm-body">
         <h2 class="pm-name">{{ displayName }}</h2>
         <p class="pm-sub">{{ roleText }}</p>
@@ -34,6 +34,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../api'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const router = useRouter()
 

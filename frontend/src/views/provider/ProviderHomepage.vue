@@ -6,7 +6,7 @@
     <section class="ph2-preview">
       <div class="ph2-cover"></div>
       <div class="ph2-body">
-        <div class="ph2-avatar">{{ (profile.display_name || '服')[0] }}</div>
+        <UserAvatar class="ph2-avatar" :size="64" :src="profile.avatar || ''" />
         <h2 class="ph2-name">{{ profile.display_name || '未设置名称' }}</h2>
         <p class="ph2-sub">
           {{ profile.verify_status === 'verified' ? '已实名认证' : '未实名' }}
@@ -45,6 +45,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '../../api'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const profile = ref({})
 const tags = ref([])

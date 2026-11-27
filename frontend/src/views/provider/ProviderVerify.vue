@@ -98,7 +98,8 @@ async function loadCerts() {
 }
 
 function goVerify() {
-  router.push('/worker/verify')
+  // 用通用认证页，避免跳 /worker 触发身份校验被退回
+  router.push('/verify')
 }
 
 function pickFile() {

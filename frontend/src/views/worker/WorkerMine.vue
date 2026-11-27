@@ -7,7 +7,7 @@
     <!-- 顶部用户卡 -->
     <section class="mine-head">
       <div class="mine-user">
-        <div class="mine-avatar">{{ avatarChar }}</div>
+        <UserAvatar class="mine-avatar" :size="64" />
         <div class="mine-user-body">
           <h2 class="mine-name">{{ displayName }}</h2>
           <p class="mine-sub">
@@ -63,6 +63,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../api'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const router = useRouter()
 
@@ -98,7 +99,7 @@ const jobMenus = [
 const moreMenus = [
   { icon: '🎯', label: '每日任务', path: '/worker/task', auth: true },
   { icon: '🎁', label: '积分兑换', path: '/worker/exchange', auth: true },
-  { icon: '🛠️', label: '同城服务', path: '/worker/service', auth: false },
+  { icon: '🧾', label: '同城服务订单', path: '/worker/service-orders', auth: true },
   { icon: '🎧', label: '联系客服', action: 'service', auth: false }
 ]
 

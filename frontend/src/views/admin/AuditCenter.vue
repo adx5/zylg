@@ -12,6 +12,7 @@
       <div class="tab" :class="{ active: currentTab === 'provider' }" @click="switchTab('provider')">服务商审核</div>
       <div class="tab" :class="{ active: currentTab === 'cert' }" @click="switchTab('cert')">技能证书</div>
       <div class="tab" :class="{ active: currentTab === 'verify' }" @click="switchTab('verify')">实名复核</div>
+      <div class="tab" :class="{ active: currentTab === 'content' }" @click="switchTab('content')">内容审核</div>
     </div>
 
     <div class="list-content">
@@ -47,6 +48,25 @@
           </div>
         </div>
         <div v-if="!certList.length" class="empty">暂无待审核证书</div>
+      </template>
+
+      <!-- 内容审核（AI 语义拦截） -->
+      <template v-else-if="currentTab === 'content'">
+        <div class="card" v-for="a in contentList" :key="a.id">
+          <div class="header-row">
+            <h3>{{ a.title }}</h3>
+            <span class="status danger">已拦截</span>
+          </div>
+          <div class="info-row"><span>类型:</span> {{ a.biz_type === 'job' ? '招聘岗位' : '同城服务' }} #{{ a.biz_id }}</div>
+          <div class="info-row"><span>拦截原因:</span> {{ a.reason || '—' }}</div>
+          <div class="info-row"><span>审核来源:</span> {{ a.source === 'ai' ? ('AI 语义模型' + (a.model ? ' / ' + a.model : '')) : '规则引擎' }}</div>
+          <div class="info-row"><span>时间:</span> {{ a.created_at }}</div>
+          <div class="op-row">
+            <button class="btn-reject" @click="reviewContent(a, false)">维持拦截</button>
+            <button class="btn-pass" @click="reviewContent(a, true)">人工放行</button>
+          </div>
+        </div>
+        <div v-if="!contentList.length" class="empty">暂无被拦截的内容</div>
       </template>
 
       <!-- 实名复核 -->
@@ -109,6 +129,7 @@ const currentTab = ref('company')
 const allList = ref([])
 const certList = ref([])
 const verifyList = ref([])
+const contentList = ref([])
 const showModal = ref(false)
 const currentItem = ref({})
 
@@ -146,6 +167,31 @@ function switchTab(tab) {
   currentTab.value = tab
   if (tab === 'cert') loadCerts()
   else if (tab === 'verify') loadVerifications()
+  else if (tab === 'content') loadContentAudits()
+}
+
+const loadContentAudits = async () => {
+  try {
+    const res = await api.get('/admin/content-audits', { params: { status: 'blocked' } })
+    contentList.value = res.data || []
+  } catch (err) {
+    contentList.value = []
+    window.$toast('获取内容审核列表失败')
+  }
+}
+
+async function reviewContent(item, pass) {
+  let reason = ''
+  if (!pass) {
+    reason = window.prompt('请填写维持拦截的原因：', item.reason || '') || ''
+  }
+  try {
+    await api.post(`/admin/content-audits/${item.id}/resolve`, { pass_verify: pass, reason })
+    window.$toast(pass ? '已人工放行' : '已维持拦截')
+    loadContentAudits()
+  } catch (err) {
+    window.$toast(err.response?.data?.detail || '操作失败')
+  }
 }
 
 async function reviewCert(cert, pass) {

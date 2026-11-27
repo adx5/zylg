@@ -275,7 +275,7 @@ async function next() {
       }
     })
 
-    window.$toast && window.$toast('上架成功，开始接单吧')
+    window.$toast && window.$toast('已提交，请到「服务管理」点击上架')
     setTimeout(() => router.replace('/provider/services'), 700)
   } catch (e) {
     window.$toast && window.$toast(e.response?.data?.detail || '上架失败，请重试')

@@ -15,7 +15,7 @@
       <!-- 商家 + 评分总览 -->
       <section class="sr-card">
         <div class="sr-shop">
-          <div class="sr-avatar">{{ (profile.display_name || '师')[0] }}</div>
+          <UserAvatar class="sr-avatar" :size="56" :round="false" :radius="16" />
           <div class="sr-shop-body">
             <h3 class="sr-shop-name">{{ profile.display_name }}</h3>
             <p class="sr-shop-sub">{{ profile.category_name }} · {{ profile.district }}</p>
@@ -67,6 +67,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../../api'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const route = useRoute()
 

@@ -341,7 +341,7 @@ const submit = async () => {
     const res = await api.post('/jobs/create', payload)
     if (res.status === 'draft') {
       setTimeout(() => {
-        const wantToVerify = window.confirm('岗位已保存至草稿箱！\n完成企业备案后，该岗位将自动对外公开展示。\n是否现在去完成备案？');
+        const wantToVerify = window.confirm('岗位已保存到草稿箱。\n完成企业备案后，请在「岗位管理」点击「立即上架」才会对外展示（上架时触发平台内容审核）。\n是否现在去完成备案？');
         if (wantToVerify) router.push('/merchant/verify')
         else router.push('/merchant/job-list')
       }, 500)

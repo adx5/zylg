@@ -8,8 +8,10 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from services.risk_rules import evaluate_job
+from services.content_audit import audit_content
 from models import (
-    City, ProviderCertificate, ProviderProfile, ProviderService,
+    City, ContentAudit, ProviderCertificate, ProviderProfile, ProviderService,
     ServiceCategory, ServiceOrder, ServiceReview, User,
 )
 from core.security import (
@@ -17,6 +19,9 @@ from core.security import (
 )
 
 router = APIRouter(prefix="/api/services", tags=["services"])
+
+# 单个服务商同时上架的服务数上限
+SERVICE_LIMIT = 3
 
 
 class OrderCreateReq(BaseModel):
@@ -425,6 +430,8 @@ async def create_service(req: ServiceCreateReq, db: AsyncSession = Depends(get_d
     if not req.title.strip():
         raise HTTPException(status_code=400, detail="服务名称不能为空")
 
+    # 🚨 统一规则：新增服务一律先落「下架/待上架」状态，
+    #    备案通过后在服务管理中手动上架，上架时才走平台内容审核。
     svc = ProviderService(
         provider_id=current_user.id,
         city_id=current_user.city_id,
@@ -435,12 +442,13 @@ async def create_service(req: ServiceCreateReq, db: AsyncSession = Depends(get_d
         description=req.description or "",
         images=req.images or [],
         meta=req.meta or {},
-        status="active",
+        status="off",
     )
     db.add(svc)
     await db.commit()
     await db.refresh(svc)
-    return {"code": 0, "message": "服务已上架", "data": {"id": svc.id}}
+    return {"code": 0, "message": "已保存为待上架，完成备案后可在列表点击「上架」",
+            "data": {"id": svc.id}}
 
 
 class ServiceUpdateReq(BaseModel):
@@ -492,7 +500,43 @@ async def toggle_service(service_id: int, status: str = "off",
     if not svc or svc.provider_id != current_user.id:
         raise HTTPException(status_code=404, detail="服务不存在")
 
-    svc.status = "active" if status == "active" else "off"
+    target = "active" if status == "active" else "off"
+
+    # 上架前校验：实名 + 上限 + 内容审核
+    if target == "active" and svc.status != "active":
+        pp = (await db.execute(
+            select(ProviderProfile).where(ProviderProfile.user_id == current_user.id)
+        )).scalar_one_or_none()
+        is_verified = (current_user.verify_status == "verified") or (pp is not None and pp.verify_status == "verified")
+        if not is_verified:
+            raise HTTPException(status_code=403, detail="请先完成实名认证后再上架服务")
+
+        active_count = (await db.execute(
+            select(func.count(ProviderService.id)).where(
+                ProviderService.provider_id == current_user.id,
+                ProviderService.status == "active")
+        )).scalar() or 0
+        if active_count >= SERVICE_LIMIT:
+            raise HTTPException(
+                status_code=400,
+                detail=f"最多同时上架 {SERVICE_LIMIT} 个服务，请先下架一个",
+            )
+
+        # 上架即触发内容审核（AI 语义 + 规则兜底）
+        audit = await audit_content(svc.title, svc.description or "", "", "")
+        if audit["decision"] == "blocked":
+            db.add(ContentAudit(
+                biz_type="service", biz_id=svc.id, city_id=svc.city_id, title=svc.title,
+                decision="blocked", reason=audit.get("reason", ""),
+                source=audit.get("source", "ai"), model=audit.get("model", ""),
+            ))
+            await db.commit()
+            raise HTTPException(
+                status_code=400,
+                detail=f"内容审核未通过：{audit.get('reason') or '命中平台内容规范'}",
+            )
+
+    svc.status = target
     await db.commit()
     return {"code": 0, "message": "已上架" if svc.status == "active" else "已下架"}
 

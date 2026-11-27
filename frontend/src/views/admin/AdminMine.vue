@@ -2,7 +2,7 @@
 <template>
   <div class="admin-mine">
     <div class="header">
-      <div class="avatar">{{ isGov ? '监' : '运' }}</div>
+      <UserAvatar class="avatar" :size="60" />
       <div class="info">
         <h3>{{ currentRole.title }}</h3>
         <p>{{ currentRole.sub }}</p>
@@ -23,6 +23,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const role = ref(localStorage.getItem('activeRole') || 'ops')
 const isGov = computed(() => role.value === 'gov')

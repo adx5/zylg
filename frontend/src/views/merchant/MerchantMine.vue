@@ -2,7 +2,7 @@
 <template>
   <div class="mine-page">
     <div class="header">
-      <div class="avatar">企</div>
+      <UserAvatar class="avatar" :size="60" :round="false" :radius="8" />
       <div class="info">
         <h3>{{ companyName }}</h3>
         <p v-if="status === 'active'" class="status-verified">✅ 已认证企业</p>
@@ -71,6 +71,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../api'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const router = useRouter()
 const status = ref('')

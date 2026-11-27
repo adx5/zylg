@@ -7,7 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from database import get_db
-from models import User, CooperationEntity, Job, Verification, AuditLog, ProviderCertificate
+from models import (
+    AuditLog, ContentAudit, CooperationEntity, Job, ProviderCertificate,
+    ProviderService, User, Verification,
+)
 from core.security import admin_required, is_hq_role
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -88,6 +91,71 @@ async def get_all_jobs(db: AsyncSession = Depends(get_db),
         job_dict["company_name"] = entity_name
         data.append(job_dict)
     return {"code": 0, "data": data}
+
+
+class ContentAuditReq(BaseModel):
+    pass_verify: bool
+    reason: str = ""
+
+
+@router.get("/content-audits")
+async def list_content_audits(status: str = "blocked",
+                              db: AsyncSession = Depends(get_db),
+                              current_user: User = Depends(admin_required)):
+    """内容审核拦截队列（AI 语义审核命中）"""
+    query = select(ContentAudit).order_by(ContentAudit.id.desc()).limit(200)
+    if status == "blocked":
+        query = query.where(ContentAudit.decision == "blocked", ContentAudit.resolved == False)
+    query = _city_scope(query, current_user, ContentAudit)
+
+    rows = (await db.execute(query)).scalars().all()
+    return {"code": 0, "data": [{
+        "id": a.id,
+        "biz_type": a.biz_type,
+        "biz_id": a.biz_id,
+        "title": a.title or "",
+        "decision": a.decision,
+        "reason": a.reason or "",
+        "source": a.source or "",
+        "model": a.model or "",
+        "resolved": bool(a.resolved),
+        "created_at": a.created_at.strftime("%Y-%m-%d %H:%M") if a.created_at else "",
+    } for a in rows]}
+
+
+@router.post("/content-audits/{audit_id}/resolve")
+async def resolve_content_audit(audit_id: int, req: ContentAuditReq,
+                                db: AsyncSession = Depends(get_db),
+                                current_user: User = Depends(admin_required)):
+    """审核员处理：放行（覆盖 risk_status=pass）或维持拦截"""
+    record = await db.get(ContentAudit, audit_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    _check_city(record.city_id, current_user)
+
+    record.resolved = True
+    record.resolved_by = current_user.id
+    record.resolved_at = datetime.utcnow()
+
+    if req.pass_verify and record.biz_type == "job":
+        job = await db.get(Job, record.biz_id)
+        if job:
+            job.risk_status = "pass"
+    if req.pass_verify and record.biz_type == "service":
+        svc = await db.get(ProviderService, record.biz_id)
+        if svc:
+            svc.status = "active"
+
+    db.add(AuditLog(
+        operator_id=current_user.id,
+        city_id=record.city_id,
+        action="内容审核放行" if req.pass_verify else "内容审核维持拦截",
+        target_type=record.biz_type,
+        target_id=record.biz_id,
+        detail=f"{record.title}；{req.reason}",
+    ))
+    await db.commit()
+    return {"code": 0, "message": "已放行" if req.pass_verify else "已维持拦截"}
 
 
 class CertificateReviewReq(BaseModel):

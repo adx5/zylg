@@ -279,6 +279,24 @@ class ProviderCertificate(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ContentAudit(Base):
+    """内容审核记录（AI 语义 + 规则），拦截项进审核员后台"""
+    __tablename__ = "content_audits"
+    id = Column(Integer, primary_key=True, index=True)
+    biz_type = Column(String(20), index=True, nullable=False)   # job / service
+    biz_id = Column(Integer, index=True, nullable=False)
+    city_id = Column(String(10), index=True, nullable=True)
+    title = Column(String(200), nullable=True)
+    decision = Column(String(20), index=True)                   # pass / blocked / review
+    reason = Column(Text, nullable=True)
+    source = Column(String(20), default="ai")                   # ai / rule
+    model = Column(String(50), nullable=True)
+    resolved = Column(Boolean, default=False, index=True)
+    resolved_by = Column(Integer, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class JobPromotion(Base):
     """岗位推广记录：服务商/经纪人把岗位分享出去帮平台招工
 

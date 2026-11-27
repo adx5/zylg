@@ -16,7 +16,7 @@
       <div class="sd-hero">
         <div class="sd-hero-bg"></div>
         <div class="sd-hero-card">
-          <div class="sd-avatar">{{ (profile.display_name || '师')[0] }}</div>
+          <UserAvatar class="sd-avatar" :size="64" :round="false" :radius="18" />
           <div class="sd-hero-body">
             <h1 class="sd-name">{{ profile.display_name }}</h1>
             <p class="sd-cat">{{ profile.category_name }} · {{ profile.district }}</p>
@@ -108,6 +108,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../../api'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()

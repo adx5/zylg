@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update, select, desc
 from sqlalchemy.orm.attributes import flag_modified
 from database import get_db
-from models import User, PointTransaction, Verification, AuditLog
+from models import User, PointTransaction, Verification, AuditLog, ProviderProfile
 from core.security import get_current_user_id, require_roles
 from services.liveness import get_liveness_provider
 
@@ -222,6 +222,14 @@ async def submit_liveness(req: LivenessReq, db: AsyncSession = Depends(get_db),
 
     # 三条分支都落库，状态以 provider 结果为准
     user.verify_status = result.status
+
+    # 服务商的实名的状态同步到服务商档案（否则资质页一直显示未认证）
+    if result.status == "verified":
+        pp = (await db.execute(
+            select(ProviderProfile).where(ProviderProfile.user_id == user.id)
+        )).scalar_one_or_none()
+        if pp:
+            pp.verify_status = "verified"
     await db.commit()
 
     messages = {

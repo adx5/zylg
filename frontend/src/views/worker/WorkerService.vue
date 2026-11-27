@@ -70,7 +70,7 @@
       </div>
 
       <article v-for="p in list" :key="p.id" class="sv-card" @click="goDetail(p.id)">
-        <div class="sv-avatar">{{ (p.display_name || '师')[0] }}</div>
+        <UserAvatar class="sv-avatar" :size="48" />
         <div class="sv-body">
           <div class="sv-name-row">
             <h3 class="sv-name">{{ p.display_name }}</h3>
@@ -102,6 +102,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../api'
+import UserAvatar from '../../components/UserAvatar.vue'
 
 const router = useRouter()
 

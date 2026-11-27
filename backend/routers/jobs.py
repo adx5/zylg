@@ -8,9 +8,10 @@ from datetime import datetime, timedelta
 from database import get_db
 # 🚨 核心修复：补上了 PointTransaction 的导入
 from models import Job, JobApplication, User, CooperationEntity, Notification, Review, Interview, ApplicationLog, \
-    PointTransaction, City, JobPromotion
+    PointTransaction, City, JobPromotion, ContentAudit
 from core.security import get_current_user, get_optional_user, require_roles, apply_city_filter, verify_resource_city
 from services.risk_rules import evaluate_job
+from services.content_audit import audit_content
 from services.promotion import award_promotion
 import json
 import os
@@ -253,7 +254,9 @@ async def create_job(req: JobCreateReq, db: AsyncSession = Depends(get_db),
                          deny_message="当前账号为求职者身份，请先完成商家认证后再发布岗位"))):
     res = await db.execute(select(CooperationEntity).where(CooperationEntity.user_id == current_user.id))
     entity = res.scalar_one_or_none()
-    initial_status = "active" if (entity and entity.status == "active") else "draft"
+    # 🚨 统一规则：新增岗位一律先落草稿（不对外展示），
+    #    备案通过后由 B 端在列表手动「上架」，上架时才走平台内容审核。
+    initial_status = "draft"
 
     # 🚨 风控第一层：确定性规则（敏感词 / 联系方式 / 薪资异常 / 行业不匹配）
     industry = ""
@@ -288,11 +291,9 @@ async def create_job(req: JobCreateReq, db: AsyncSession = Depends(get_db),
     await db.commit()
 
     if risk.decision == "blocked":
-        message = f"岗位触发风控拦截，已保存为草稿：{risk.as_text()}"
-    elif risk.decision == "review":
-        message = f"岗位已提交，待平台人工复核：{risk.as_text()}"
+        message = f"已保存为草稿（内容审核未通过，需修改后重新提交）：{risk.as_text()}"
     else:
-        message = "发布成功"
+        message = "已保存到草稿箱，完成备案后可在岗位管理中点击「上架」"
 
     return {"code": 0, "message": message, "status": initial_status,
             "promotion_points": promo_points, "risk": risk.to_dict()}
@@ -409,17 +410,38 @@ async def publish_draft_job(job_id: int, db: AsyncSession = Depends(get_db),
 
     verify_resource_city(job.city_id, current_user)
 
-    # 🚨 风控闸门：创建时已判定；被拦截的岗位必须等平台人工复核放行（risk_status=pass）才能上架。
-    # 当前没有岗位编辑接口，内容只可能在创建时写入，因此这里以落库判定为准，无需重复评估。
-    if job.risk_status == "blocked":
-        raise HTTPException(
-            status_code=400,
-            detail=f"该岗位已被风控拦截，需平台复核后才能上架：{job.risk_points}"
-        )
+    # 🚨 上架即触发内容审核（AI 语义模型 + 规则兜底）
+    #    人工复核已放行（risk_status=pass）的岗位不再重复审核
+    manual_ok = job.risk_status == "pass"
+
+    if not manual_ok:
+        audit = await audit_content(
+            job.title, job.description or "", job.requirement or "", job.salary or "")
+        job.risk_checked_at = datetime.utcnow()
+        job.risk_points = json.dumps(audit, ensure_ascii=False)
+
+        if audit["decision"] == "blocked":
+            job.risk_status = "blocked"
+            db.add(ContentAudit(
+                biz_type="job", biz_id=job.id, city_id=job.city_id, title=job.title,
+                decision="blocked", reason=audit.get("reason", ""),
+                source=audit.get("source", "ai"), model=audit.get("model", ""),
+            ))
+            await db.commit()
+            raise HTTPException(
+                status_code=400,
+                detail=f"内容审核未通过：{audit.get('reason') or '命中平台内容规范'}",
+            )
+
+        job.risk_status = "pass" if audit["decision"] == "pass" else "review"
+    else:
+        job.risk_status = "pass"
 
     job.publish_status = "active"
     await db.commit()
-    return {"code": 0, "message": "岗位已成功上架", "risk_status": job.risk_status}
+
+    msg = "岗位已成功上架" if job.risk_status == "pass" else "岗位已上架，内容待平台人工复核"
+    return {"code": 0, "message": msg, "risk_status": job.risk_status}
 
 
 @router.post("/{job_id:int}/promote")

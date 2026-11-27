@@ -22,14 +22,14 @@
           <div class="ps-card-head">
             <h3 class="ps-card-title">{{ s.title }}</h3>
             <span :class="['ps-status', s.status === 'active' ? 'ok' : 'off']">
-              {{ s.status === 'active' ? '已上架' : '已下架' }}
+              {{ s.status === 'active' ? '已上架' : '待上架' }}
             </span>
           </div>
           <div class="ps-price">￥{{ s.price }}<small>/{{ s.price_unit }}</small></div>
           <p class="ps-desc">{{ s.description || '暂无描述' }}</p>
           <div class="ps-ops">
             <button class="ps-btn" @click="openEdit(s)">编辑服务</button>
-            <button class="ps-btn" @click="toggle(s)">{{ s.status === 'active' ? '下架服务' : '重新上架' }}</button>
+            <button class="ps-btn" @click="toggle(s)">{{ s.status === 'active' ? '下架服务' : '上架服务' }}</button>
           </div>
         </article>
 
